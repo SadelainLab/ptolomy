@@ -1,0 +1,14 @@
+archive
+figures
+notes
+data
+secrets.R
+
+.DS_Store
+keys.R
+*.RData
+*.Rhistory
+*.tsv
+*.xlsx
+*.zip
+*.pdf

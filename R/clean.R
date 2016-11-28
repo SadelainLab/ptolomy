@@ -795,6 +795,106 @@ GetID <- function(query, id.type) {
 }
 
 
+
+GetHugoID <- function(query) {
+
+	query %<>% list.filter(!is.na(.))
+
+	hugo.mart <- 
+		biomaRt::getBM(
+			attributes = c('hgnc_symbol', 'ensembl_gene_id'),
+			filters = 'ensembl_gene_id',
+			values = query,
+			mart = mart
+		) %>%
+		tbl_df %>%
+		set_names(c('hgnc', 'ensembl.gene')) %>%
+		mutate(hgnc = as.character(hgnc), ensembl.gene = as.character(ensembl.gene)) %>%
+		right_join(data_frame(ensembl.gene = as.character(query)), by = 'ensembl.gene') %>%
+		mutate(hgnc = ifelse(hgnc == '', NA, hgnc))
+
+	receipt <-
+		suppressWarnings(try(
+			mygene::queryMany(
+				qterms    = query,
+				fields    = 'symbol',
+				scopes    = c('symbol', 'ensembl.gene'),
+				species   = 'human',
+				returnall = TRUE )
+		)) %$%
+		response
+
+	if('symbol' %in% names(receipt)) {
+		receipt <- receipt[,c('query', 'symbol')]
+
+		hugo.mygene <-
+			map2(as.list(receipt$query), receipt$symbol, ~ { data_frame(query = .x, symbol = unlist(.y)) }) %>%
+			bind_rows %>%
+			set_names(c('ensembl.gene', 'hgnc'))
+
+	} else {
+		receipt <- receipt[,c('query', 'symbol')]
+
+		receipt.query <- as.list(receipt$query)
+		receipt.symbol <- map(receipt$symbol, ~{
+			symbol <- unlist(.x)
+			if(is.null(symbol)) {
+				symbol <- NA
+			}
+			symbol
+		})
+
+		hugo.mygene <-
+			map2(receipt.query, receipt.symbol, ~ {
+				data_frame(query = .x, symbol = unlist(.y))
+			}) %>%
+			bind_rows %>%
+			set_names(c('ensembl.gene', 'hgnc'))
+	}
+
+	bind_rows(hugo.mart, hugo.mygene) %>%
+	unique %>%
+	set_names(c('hgnc', 'ensembl.gene')) %>%
+	right_join(data_frame(ensembl.gene = as.character(query)), by = 'ensembl.gene') %>%
+	mutate(hgnc = ifelse(hgnc == '', NA, hgnc)) %>%
+	group_by(ensembl.gene) %>%
+	filter(n() == 1 | !all(is.na(hgnc)) & !is.na(hgnc)) %>%
+	ungroup %>%
+	unique
+}
+
+
+GetEnsemblID <- function(query) {
+
+	query %<>% list.filter(!is.na(.))
+
+	bind_rows(
+		GetMartID(query, 'hgnc_symbol'),
+		GetMyGeneID(query, 'symbol'),
+		GetMyGeneID(query, 'alias')
+	) %>%
+	unique %>%
+	set_names(c('hgnc', 'ensembl.gene')) %>%
+	right_join(data_frame(hgnc = as.character(query)), by = 'hgnc') %>%
+	mutate(ensembl.gene = ifelse(ensembl.gene == '', NA, ensembl.gene)) %>%
+	group_by(hgnc) %>%
+	filter(n() == 1 | !all(is.na(ensembl.gene)) & !is.na(ensembl.gene)) %>%
+	ungroup %>%
+	unique
+}
+
+
+
+
+#----------#
+#          #
+#  #
+#          #
+#----------#
+
+
+
+
 id.query <-
 	bind_rows(
 		locate.location %>% rename(query = id) %>% select(-database, -location),
@@ -1149,11 +1249,57 @@ protein.data <-
 	mutate(gross.mean.abundance = ifelse(is.nan(gross.mean.abundance), NA, gross.mean.abundance))
 
 
-#------------
-# write RData
-#------------
+id.dict <-
+	protein.data$ensembl.gene %>%
+	unique %>%
+	GetHugoID %>%
+	arrange(hgnc) %>%
+	group_by(hgnc) %>%
+	slice(1) %>%
+	ungroup
+
+step.0.0 <-
+	protein.data %>%
+	filter(!is.na(tissue)) %>%
+	select(-mean.abundance) %>%
+	unique %>%
+	rowwise %>%
+	mutate(tissue.max = max(c(hpa, hpm, pdb), -1, na.rm = TRUE)) %>%
+	mutate(tissue.mean = mean(c(hpa, hpm, pdb), na.rm = TRUE)) %>%
+	ungroup %>%
+	mutate(tissue.max = ifelse(tissue.max == -1, NA, tissue.max)) %>%
+	mutate(tissue.mean = ifelse(is.nan(tissue.mean), NA, tissue.mean)) %>%
+	left_join(id.dict, by = 'ensembl.gene') %>%
+	mutate(num.tissues = tissue %>% unique %>% length) %>%
+	select(hgnc, ensembl.gene, tissue, num.tissues, db.num, gross.mean.abundance, membrane, hpa, hpm, pdb, tissue.max, tissue.mean, everything())
+
+step.0.1 <-
+	step.0.0 %>%
+	group_by(hgnc, ensembl.gene) %>%
+	unique %>%
+	mutate(fill = sum(!is.na(tissue.max)) / num.tissues) %>%
+	ungroup %>%
+	select(hgnc, ensembl.gene, gross.mean.abundance, fill) %>%
+	unique %>%
+	arrange(desc(fill)) %>%
+	group_by(hgnc) %>%
+	slice(1) %>%
+	ungroup %>%
+	group_by(ensembl.gene) %>%
+	slice(1) %>%
+	ungroup %>%
+	select(hgnc, ensembl.gene, fill)
+
+step.0 <-
+	step.0.0 %>%
+	inner_join(step.0.1, by = c('hgnc', 'ensembl.gene')) %>%
+	select(hgnc, ensembl.gene, tissue, db.num, gross.mean.abundance, membrane, fill, hpa, hpm, pdb, tissue.max, tissue.mean, everything(), -num.tissues)
 
 
-save(list = 'protein.data', file = 'protein.data.RData')
+test <- function(x) {
 
+	y <- step.1 %>% filter(hgnc == x) %>% slice(1) %$% ensembl.gene
 
+	membrane.location %>% filter(ensembl.gene == y)
+
+}

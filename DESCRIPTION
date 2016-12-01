@@ -1,9 +1,0 @@
-Package: ptolomy
-Title: Ptolomy
-Version: 0.0.1.0
-Authors@R: person("Samuel", "Berman", email = "bermans@mskcc.org", role = c("aut", "cre"))
-Description: Epitope annotation engine for chimeric antigen receptor candidates.
-Depends: R (>= 3.3.1)
-License: MIT
-Encoding: UTF-8
-LazyData: true

@@ -1,14 +1,15 @@
 archive
-figures
-notes
 data
-secrets.R
+figures
+tables
 
 .DS_Store
-keys.R
 *.RData
 *.Rhistory
 *.tsv
 *.xlsx
 *.zip
 *.pdf
+
+notebook/secrets.R
+notebook/.ipynb_checkpoints

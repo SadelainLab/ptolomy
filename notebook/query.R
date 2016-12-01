@@ -1,7 +1,3 @@
-
-
-
-
 #-------------#
 #             #
 #  retreival  #
@@ -9,14 +5,13 @@
 #-------------#
 
 
-
-
 #--------
 # imports
 #--------
 
 
-source('secrets.R')
+load('step.0.RData')
+source('keys.R')
 
 
 #----------

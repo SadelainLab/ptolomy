@@ -1,15 +1,3 @@
-#' Tissue binning
-#'
-#' @param love Do you love cats? Defaults to TRUE.
-#' 
-#' @keywords cats
-#' 
-#' @export
-#' 
-#' @examples
-#' cat_function()
-
-
 #--------
 # imports
 #--------
@@ -17,7 +5,7 @@
 
 pacman::p_load(jsonlite, httr)
 
-source('secrets.R')
+source('keys.R')
 
 
 #--------------------#
@@ -1295,11 +1283,4 @@ step.0 <-
 	inner_join(step.0.1, by = c('hgnc', 'ensembl.gene')) %>%
 	select(hgnc, ensembl.gene, tissue, db.num, gross.mean.abundance, membrane, fill, hpa, hpm, pdb, tissue.max, tissue.mean, everything(), -num.tissues)
 
-
-test <- function(x) {
-
-	y <- step.1 %>% filter(hgnc == x) %>% slice(1) %$% ensembl.gene
-
-	membrane.location %>% filter(ensembl.gene == y)
-
-}
+save(list = 'step.0', file = 'step.0.RData')

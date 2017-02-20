@@ -1,7 +1,7 @@
 archive
 data
-figures
-tables
+figures+tables
+manuscript
 
 .DS_Store
 *.RData
@@ -11,5 +11,5 @@ tables
 *.zip
 *.pdf
 
-notebook/secrets.R
+notebook/_keys.R
 notebook/.ipynb_checkpoints
